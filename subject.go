@@ -70,3 +70,8 @@ type Observable interface {
 	// Next recevie message
 	Next(interface{})
 }
+
+// NewSubject return subject
+func NewSubject() *Subject {
+	return &Subject{observers: make(map[*Subscription]Observable)}
+}
