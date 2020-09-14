@@ -1,22 +1,35 @@
 package broadcaster
 
 import (
-	"fmt"
 	"sync"
 )
 
 // Subject pub/sub patterns
 type Subject struct {
 	observers map[*Subscription]Observable
+	complete  bool
 	mu        sync.Mutex
 }
 
 // Publish publish message to observers
 func (s *Subject) Publish(msg interface{}) {
+	if s.complete {
+		return
+	}
 	s.mu.Lock()
 	for _, observer := range s.observers {
 		observer.Next(msg)
 	}
+	s.mu.Unlock()
+}
+
+// Complete complete publish message
+func (s *Subject) Complete() {
+	if s.complete {
+		return
+	}
+	s.mu.Lock()
+	s.complete = true
 	s.mu.Unlock()
 }
 
@@ -54,24 +67,6 @@ func (s *Subscription) Unsubscribe(lock bool) {
 
 // Observable observer to implements
 type Observable interface {
-	// how to recevie message
+	// Next recevie message
 	Next(interface{})
-	// // error
-	// Error(error)
-	// // complete
-	// Complete()
-}
-
-type observer struct {
-	tag int
-}
-
-func (o *observer) Next(message interface{}) {
-	fmt.Printf("observer %v recevied message ---> %v\n", o.tag, message)
-
-}
-
-// NewObserver a example observer implment Observable
-func NewObserver() Observable {
-	return &observer{}
 }
