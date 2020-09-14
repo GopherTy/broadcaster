@@ -1,17 +1,18 @@
 package broadcaster
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestBroadcast(t *testing.T) {
 	var wg sync.WaitGroup
 
 	bc := NewBroadcaster(0)
-	bc.Run()
-	defer bc.Close()
+	go bc.Run()
 
 	for i := 0; i < 3; i++ {
 		wg.Add(1)
@@ -20,9 +21,12 @@ func TestBroadcast(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			defer bc.Unsubscribe(observer)
-			for j := 0; j < 2; j++ {
-				if msg, ok := <-observer; ok {
-					fmt.Printf("observer: %v recevied  %v message------>%v \n", i+1, j+1, msg)
+			for {
+				select {
+				case msg := <-observer:
+					fmt.Printf("observer: %v recevied message------>%v \n", i+1, msg)
+				case <-bc.Done():
+					return
 				}
 			}
 		}(i)
@@ -30,12 +34,16 @@ func TestBroadcast(t *testing.T) {
 
 	bc.Publish("Hello ")
 	bc.Publish("World")
+	// maybe done signal arrived before message
+	time.Sleep(100 * time.Millisecond)
+	bc.Close()
 	wg.Wait()
 }
 
 func TestBroadcastClosePublishSubUnsub(t *testing.T) {
 	bc := NewBroadcaster(0)
-	bc.Run()
+	go bc.Run()
+	context.Background()
 
 	err := bc.Close()
 	handError(err)
@@ -57,7 +65,7 @@ func handError(err error) {
 
 func BenchmarkBroadcast(b *testing.B) {
 	bc := NewBroadcaster(1000)
-	bc.Run()
+	go bc.Run()
 	defer bc.Close()
 
 	observer := make(chan interface{})
@@ -72,7 +80,7 @@ func BenchmarkParallelBrodcast(b *testing.B) {
 	observer := make(chan interface{})
 
 	bc := NewBroadcaster(0)
-	bc.Run()
+	go bc.Run()
 	defer bc.Close()
 
 	bc.Subscribe(observer)

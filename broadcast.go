@@ -2,7 +2,7 @@ package broadcaster
 
 import (
 	"errors"
-	"sync/atomic"
+	"sync"
 )
 
 // Broadcaster pub/sub patterns
@@ -12,7 +12,11 @@ type Broadcaster interface {
 	Publish(v interface{}) error
 	Run() error
 	Close() error
+	Done() chan struct{}
 }
+
+// ErrCanceled .
+var ErrCanceled = errors.New("broadcaster already closed")
 
 type broadcaster struct {
 	input       chan interface{}
@@ -20,79 +24,71 @@ type broadcaster struct {
 	unsubscribe chan chan interface{}
 	observers   map[chan interface{}]bool
 	done        chan struct{} // a signal to close broadcaster
-	l           uint32
+	mu          sync.Mutex
 }
 
 func (b *broadcaster) Run() error {
-	if b == nil {
-		return errors.New("broadcaster cannot be  nil")
-	}
-	go func() {
-		for {
-			select {
-			case msg := <-b.input:
-				// publish message to observers
-				for observer := range b.observers {
-					observer <- msg
-				}
-			case observer := <-b.subscribe:
-				b.observers[observer] = true
-			case observer := <-b.unsubscribe:
-				delete(b.observers, observer)
-			case <-b.done:
-				return
+	for {
+		select {
+		case msg := <-b.input:
+			// publish message to observers
+			for observer := range b.observers {
+				observer <- msg
 			}
+		case observer := <-b.subscribe:
+			b.observers[observer] = true
+		case observer := <-b.unsubscribe:
+			delete(b.observers, observer)
+		case <-b.done:
+			return nil
 		}
-	}()
-	return nil
+	}
 }
 
 func (b *broadcaster) Close() error {
-	if b == nil {
-		return errors.New("broadcaster cannot be nil")
-	}
 	select {
 	case <-b.done:
-		return errors.New("broadcaster already closed")
+		return ErrCanceled
 	default:
-		if atomic.CompareAndSwapUint32(&b.l, 0, 1) {
-			close(b.done)
-		}
+		b.mu.Lock()
+		close(b.done)
+		b.mu.Unlock()
 	}
 	return nil
 }
 
-func (b *broadcaster) Publish(message interface{}) error {
-	if b == nil {
-		return errors.New("broadcaster cannot be nil")
+func (b *broadcaster) Done() chan struct{} {
+	b.mu.Lock()
+	if b.done == nil {
+		b.done = make(chan struct{})
 	}
+	d := b.done
+	b.mu.Unlock()
+	return d
+}
+
+func (b *broadcaster) Publish(message interface{}) error {
 	select {
 	case <-b.done:
-		return errors.New("broadcaster already closed")
+		return ErrCanceled
 	case b.input <- message: // broadcaster receive message
 	}
 	return nil
 }
 
 func (b *broadcaster) Subscribe(observer chan interface{}) error {
-	if b == nil {
-		return errors.New("broadcaster cannot be nil")
-	}
 	select {
 	case <-b.done:
-		return errors.New("broadcaster already closed")
+		return ErrCanceled
 	case b.subscribe <- observer:
 	}
 	return nil
 }
 
 func (b *broadcaster) Unsubscribe(observer chan interface{}) error {
-	if b == nil {
-		return errors.New("broadcaster cannot be nil")
-	}
 	select {
 	case <-b.done:
-		return errors.New("broadcaster already closed")
+		return ErrCanceled
 	case b.unsubscribe <- observer:
 	}
 	return nil
