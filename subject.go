@@ -75,3 +75,25 @@ type Observable interface {
 func NewSubject() *Subject {
 	return &Subject{observers: make(map[*Subscription]Observable)}
 }
+
+// type handleFunc func(interface{})
+
+// func (f handleFunc) Next(m interface{}) {
+// 	f(m)
+// }
+
+// var DefaultObserver = &observer
+
+// var observer Observer
+
+// type Observer struct {
+// 	o Observable
+// }
+
+// func (o *Observer) Next(m interface{}) {
+// 	o.o.Next(m)
+// }
+
+// func HandleFunc(handler func(interface{})) {
+// 	DefaultObserver.o = handleFunc(handler)
+// }

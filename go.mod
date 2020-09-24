@@ -1,3 +1,3 @@
-module github.com/GopherTy/broadcaster
+module github.com/gopherty/broadcaster
 
 go 1.12
