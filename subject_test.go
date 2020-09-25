@@ -36,6 +36,29 @@ func TestSubject(t *testing.T) {
 	s.Publish(3)
 }
 
+func TestHandleFuncSubject(t *testing.T) {
+	s := NewSubject()
+
+	const count = 4
+	for i := 1; i < count; i++ {
+		var subscription *Subscription
+		func(i int) {
+			subscription = s.HandleFunc(func(msg interface{}) {
+				fmt.Printf("observer %v recieve message ---> %v \n", i, msg)
+			})
+		}(i)
+
+		if i == 2 {
+			subscription.Unsubscribe(true)
+		}
+	}
+
+	s.Publish("hello")
+	s.Publish("world")
+	s.Complete()
+	s.Publish(3)
+}
+
 func BenchmarkSubject(b *testing.B) {
 	s := &Subject{
 		observers: make(map[*Subscription]Observable),

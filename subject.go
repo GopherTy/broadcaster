@@ -75,3 +75,20 @@ type Observable interface {
 func NewSubject() *Subject {
 	return &Subject{observers: make(map[*Subscription]Observable)}
 }
+
+type handlerFunc func(interface{})
+
+func (f handlerFunc) Next(msg interface{}) {
+	f(msg)
+}
+
+// HandleFunc regist handle function
+func (s *Subject) HandleFunc(f func(interface{})) *Subscription {
+	subs := &Subscription{subj: s}
+
+	s.mu.Lock()
+	s.observers[subs] = handlerFunc(f)
+	s.mu.Unlock()
+
+	return subs
+}
