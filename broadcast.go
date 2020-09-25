@@ -38,6 +38,7 @@ func (b *broadcaster) Run() error {
 		case observer := <-b.subscribe:
 			b.observers[observer] = true
 		case observer := <-b.unsubscribe:
+			close(observer)
 			delete(b.observers, observer)
 		case <-b.done:
 			return nil
